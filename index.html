@@ -129,7 +129,7 @@ import {
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* 🔥 FIREBASE CONFIG (REPLACE THIS) */
+/* 🔥 FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "test",
   authDomain: "test",
@@ -143,7 +143,16 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-/* 👑 ADMIN EMAILS */
+/* 👇 FIXED: DOM REFERENCES (THIS WAS YOUR MAIN BUG) */
+const email = document.getElementById("email");
+const pass = document.getElementById("pass");
+const text = document.getElementById("text");
+
+const chat = document.getElementById("chat");
+const online = document.getElementById("online");
+const msg = document.getElementById("msg");
+
+/* ADMIN EMAILS */
 const ADMIN_EMAILS = [
     "mcfly200976@gmail.com",
     "lgilley2028@jpkeefehs.org"
@@ -169,7 +178,12 @@ window.signin = async function () {
 
 /* LOGIN STATE */
 onAuthStateChanged(auth, (u) => {
-    if (!u) return;
+
+    if (!u) {
+        document.getElementById("login").classList.remove("hidden");
+        document.getElementById("hub").classList.add("hidden");
+        return;
+    }
 
     document.getElementById("login").classList.add("hidden");
     document.getElementById("hub").classList.remove("hidden");
