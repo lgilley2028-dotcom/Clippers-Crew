@@ -109,8 +109,140 @@
 </div>
 
 <script type="module">
-    console.log("SCRIPT LOADED");
-    document.body.innerHTML = "<h1>JS IS WORKING</h1>";
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    setDoc,
+    doc,
+    deleteDoc,
+    getDocs
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+/* 🔥 FIREBASE CONFIG (REPLACE THIS) */
+const firebaseConfig = {
+  apiKey: "test",
+  authDomain: "test",
+  projectId: "test",
+  storageBucket: "test",
+  messagingSenderId: "test",
+  appId: "test"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+/* 👑 ADMIN EMAILS */
+const ADMIN_EMAILS = [
+    "mcfly200976@gmail.com",
+    "lgilley2028@jpkeefehs.org"
+];
+
+/* SIGN UP */
+window.signup = async function () {
+    try {
+        await createUserWithEmailAndPassword(auth, email.value, pass.value);
+    } catch (e) {
+        msg.innerText = e.message;
+    }
+};
+
+/* SIGN IN */
+window.signin = async function () {
+    try {
+        await signInWithEmailAndPassword(auth, email.value, pass.value);
+    } catch (e) {
+        msg.innerText = e.message;
+    }
+};
+
+/* LOGIN STATE */
+onAuthStateChanged(auth, (u) => {
+    if (!u) return;
+
+    document.getElementById("login").classList.add("hidden");
+    document.getElementById("hub").classList.remove("hidden");
+
+    setOnline(u);
+    listenChat();
+    listenOnline();
+
+    if (ADMIN_EMAILS.includes(u.email)) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+    }
+});
+
+/* CHAT */
+window.send = async function () {
+    if (!text.value) return;
+
+    await addDoc(collection(db, "messages"), {
+        user: auth.currentUser.email,
+        text: text.value,
+        time: Date.now()
+    });
+
+    text.value = "";
+};
+
+function listenChat() {
+    onSnapshot(collection(db, "messages"), (snap) => {
+        let html = "";
+
+        snap.forEach(d => {
+            let m = d.data();
+            html += `<div class="msg"><b>${m.user}</b>: ${m.text}</div>`;
+        });
+
+        chat.innerHTML = html;
+        chat.scrollTop = chat.scrollHeight;
+    });
+}
+
+/* ONLINE */
+function setOnline(user) {
+    setDoc(doc(db, "online", user.email), {
+        time: Date.now()
+    });
+
+    setInterval(() => {
+        setDoc(doc(db, "online", user.email), {
+            time: Date.now()
+        });
+    }, 5000);
+}
+
+function listenOnline() {
+    onSnapshot(collection(db, "online"), (snap) => {
+        let html = "";
+        snap.forEach(d => {
+            html += `<div>${d.id}</div>`;
+        });
+        online.innerHTML = html;
+    });
+}
+
+/* ADMIN ACTIONS */
+window.clearChat = async function () {
+    const snap = await getDocs(collection(db, "messages"));
+    snap.forEach(d => deleteDoc(doc(db, "messages", d.id)));
+};
+
+window.wipeOnline = async function () {
+    const snap = await getDocs(collection(db, "online"));
+    snap.forEach(d => deleteDoc(doc(db, "online", d.id)));
+};
 
 </script>
 
