@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Clipper Crew // Supabase Edition</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: monospace;
+            background: #b8b15a;
+        }
+
+        .bg {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                #b8b15a,
+                #b8b15a 25px,
+                #a59f50 25px,
+                #a59f50 50px
+            );
+            z-index: -1;
+        }
+
+        .hub {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            height: 100vh;
+        }
+
+        .panel {
+            border: 1px solid black;
+            background: rgba(0,0,0,0.15);
+            padding: 10px;
+            overflow-y: auto;
+        }
+
+        input, button {
+            width: 90%;
+            padding: 8px;
+            margin-top: 5px;
+            background: #111;
+            color: #d6d06a;
+            border: none;
+        }
+
+        .chatBox {
+            height: 75vh;
+            overflow-y: auto;
+            border: 1px solid black;
+            padding: 5px;
+        }
+
+        .hidden { display: none; }
+
+        .msg { margin: 4px 0; }
+    </style>
+</head>
+
+<body>
+
+<div class="bg"></div>
+
+<!-- LOGIN -->
+<div id="login" style="text-align:center; margin-top:120px;">
+    <h1>CLIPPER CREW</h1>
+
+    <input id="email" placeholder="email"><br>
+    <input id="pass" type="password" placeholder="password"><br>
+
+    <button onclick="signup()">register</button>
+    <button onclick="signin()">login</button>
+
+    <p id="msg"></p>
+</div>
+
+<!-- HUB -->
+<div id="hub" class="hub hidden">
+
+    <div class="panel">
+        <h3>ONLINE</h3>
+        <div id="online"></div>
+    </div>
+
+    <div class="panel">
+        <h3>GLOBAL CHAT</h3>
+
+        <div class="chatBox" id="chat"></div>
+
+        <input id="text" placeholder="message">
+        <button onclick="send()">send</button>
+    </div>
+
+    <div id="adminPanel" class="panel hidden">
+        <h3>ADMIN PANEL</h3>
+        <button onclick="clearChat()">wipe chat</button>
+    </div>
+
+</div>
+
+<script type="module">
+
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+/* 🔥 YOUR SUPABASE CONFIG */
+const supabaseUrl = "https://cnzhfuqohovgmobzdlgz.supabase.co";
+const supabaseKey = "sb_publishable_zQYSTj5G-llPTE2KtP8eow_tdqzdFaj";
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+/* DOM */
+const email = document.getElementById("email");
+const pass = document.getElementById("pass");
+const text = document.getElementById("text");
+const chat = document.getElementById("chat");
+const online = document.getElementById("online");
+const msg = document.getElementById("msg");
+
+/* ADMINS */
+const ADMIN_EMAILS = [
+    "mcfly200976@gmail.com",
+    "lgilley2028@jpkeefehs.org"
+];
+
+let currentUser = null;
+
+/* SIGN UP */
+window.signup = async function () {
+    const { error } = await supabase.auth.signUp({
+        email: email.value,
+        password: pass.value
+    });
+
+    if (error) msg.innerText = error.message;
+};
+
+/* SIGN IN */
+window.signin = async function () {
+    const { error, data } = await supabase.auth.signInWithPassword({
+        email: email.value,
+        password: pass.value
+    });
+
+    if (error) msg.innerText = error.message;
+    else currentUser = data.user;
+};
+
+/* AUTH CHECK */
+supabase.auth.onAuthStateChange((event, session) => {
+
+    if (!session) return;
+
+    currentUser = session.user;
+
+    document.getElementById("login").classList.add("hidden");
+    document.getElementById("hub").classList.remove("hidden");
+
+    startChat();
+    startOnline();
+
+    if (ADMIN_EMAILS.includes(currentUser.email)) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+    }
+});
+
+/* CHAT */
+window.send = async function () {
+    if (!text.value) return;
+
+    await supabase.from("messages").insert({
+        email: currentUser.email,
+        message: text.value
+    });
+
+    text.value = "";
+};
+
+function startChat() {
+    supabase
+        .channel("messages")
+        .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, payload => {
+            loadMessages();
+        })
+        .subscribe();
+
+    loadMessages();
+}
+
+async function loadMessages() {
+    let { data } = await supabase.from("messages").select("*").order("id");
+
+    chat.innerHTML = data.map(m =>
+        `<div class="msg"><b>${m.email}</b>: ${m.message}</div>`
+    ).join("");
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+/* ONLINE USERS */
+function startOnline() {
+    setInterval(async () => {
+        if (!currentUser) return;
+
+        await supabase.from("online_users").upsert({
+            email: currentUser.email,
+            last_seen: new Date()
+        });
+    }, 5000);
+
+    loadOnline();
+}
+
+async function loadOnline() {
+    let { data } = await supabase.from("online_users").select("*");
+
+    online.innerHTML = data.map(u =>
+        `<div>${u.email}</div>`
+    ).join("");
+}
+
+/* ADMIN */
+window.clearChat = async function () {
+    await supabase.from("messages").delete().neq("id", 0);
+};
+
+</script>
+
+</body>
+</html>
